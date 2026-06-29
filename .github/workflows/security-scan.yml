@@ -70,7 +70,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-   # ==========================================
+  # ==========================================
     # ÉTAPE 3 : LOGINS & BUILD DOCKER SUR GHCR
     # ==========================================
     - name: Connexion à GitHub Container Registry (GHCR)
@@ -80,17 +80,21 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Compiler l'application Java (Génération du fichier JAR)
+      run: |
+        # On compile le projet en ignorant les tests pour aller plus vite dans le pipeline CI/CD
+        ./mvnw clean package -DskipTests || mvn clean package -DskipTests
+
     - name: Construire et Pousser l'image Docker vers GHCR
       run: |
         # 1. On passe le nom du dépôt en minuscules et on le stocke localement
         IMAGE_NAME=$(echo "ghcr.io/${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
         
-        # 2. On lance la commande de build docker classique
+        # 2. On lance la commande de build docker classique (qui trouvera maintenant le dossier target/)
         docker build -t $IMAGE_NAME:latest .
         
         # 3. On pousse l'image sur GHCR
         docker push $IMAGE_NAME:latest
-
     # ==========================================
     # ÉTAPE 4 : SIGNATURE NUMÉRIQUE COSIGN SUR GHCR
     # ==========================================
