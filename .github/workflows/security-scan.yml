@@ -70,35 +70,42 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+   # ==========================================
+    # ÉTAPE 3 : LOGINS & BUILD DOCKER SUR GHCR
     # ==========================================
-    # ÉTAPE 3 : LOGINS, BUILD DOCKER & REGISTRY (COMMENTÉ TEMPORAIREMENT)
+    - name: Connexion à GitHub Container Registry (GHCR)
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Construire et Pousser l'image Docker vers GHCR
+      run: |
+        # 1. On passe le nom du dépôt en minuscules et on le stocke localement
+        IMAGE_NAME=$(echo "ghcr.io/${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+        
+        # 2. On lance la commande de build docker classique
+        docker build -t $IMAGE_NAME:latest .
+        
+        # 3. On pousse l'image sur GHCR
+        docker push $IMAGE_NAME:latest
+
     # ==========================================
-    # - name: Connexion à Docker Hub
-    #   uses: docker/login-action@v3
-    #   with:
-    #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-    #     password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    # - name: Construire et Pousser l'image Docker
-    #   uses: docker/build-push-action@v5
-    #   with:
-    #     context: .
-    #     push: true
-    #     tags: ${{ secrets.DOCKERHUB_USERNAME }}/identity-service:latest
-
+    # ÉTAPE 4 : SIGNATURE NUMÉRIQUE COSIGN SUR GHCR
     # ==========================================
-    # ÉTAPE 4 : SIGNATURE NUMÉRIQUE COSIGN (COMMENTÉ TEMPORAIREMENT)
-    # ==========================================
-    # - name: Installer Cosign dans la VM Actions
-    #   uses: sigstore/cosign-installer@v3.5.0
+    - name: Installer Cosign dans la VM Actions
+      uses: sigstore/cosign-installer@v3.5.0
 
-    # - name: Signer l'image Docker publiée
-    #   run: |
-    #     cosign sign --yes --key env://COSIGN_PRIVATE_KEY ${{ secrets.DOCKERHUB_USERNAME }}/identity-service:latest
-    #   env:
-    #     COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_KEY }}
-    #     COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
-
+    - name: Signer l'image Docker publiée sur GHCR
+      run: |
+        # On recrée la variable en minuscules pour Cosign
+        IMAGE_NAME=$(echo "ghcr.io/${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+        
+        cosign sign --yes --key env://COSIGN_PRIVATE_KEY $IMAGE_NAME:latest
+      env:
+        COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_KEY }}
+        COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
     # ==========================================
     # ÉTAPE 5 : ANALYSE DES RESULTATS & ALERTE BOT TELEGRAM
     # ==========================================
